@@ -185,7 +185,6 @@ struct screen{
 void screen :: flush(){
     cout<<"\e[2J";
     cout<<"\e[1;1H";
-    this->x_pos = this->y_pos = 1;
 }
 screen :: screen(FILE *in, FILE *out, string home=""){
     this->normal = true;
@@ -197,6 +196,9 @@ screen :: screen(FILE *in, FILE *out, string home=""){
         getcwd(cwd, sizeof(cwd));
         this->HOME = string(cwd);
     }
+    this->x_pos = 2;
+    this->current_top = 1;
+    this->y_pos = 1;
     //debug(this->HOME);
     this->current_directory.open_directory(this->HOME);
     this->current_position_in_history = 0;
@@ -209,23 +211,22 @@ void screen :: get_screen_size(){
     ioctl(fileno(this->input), TIOCGWINSZ, &size);
     this->number_of_rows = (int)size.ws_row;
     this->number_of_columns = (int)size.ws_col;
-    this->current_top = 1;
-    this->current_bottom = this->number_of_rows - 3;
+    this->current_bottom = this->number_of_rows - 2;
     //cerr<<this->current_bottom<<" "<<this->number_of_rows<<" "<<this->current_directory.all_files_folder.size()<<endl;
     this->current_bottom = min(this->current_bottom ,(int) this->current_directory.all_files_folder.size()); 
     this->current_bottom += this->current_top;
 }
 void screen :: fill_screen(){
-    //this->flush();
+    this->flush();
     this->get_screen_size();
     cout<<"\e[1m"<<this->current_directory.current_directory<<"\e[0m"<<endl;
-    //cout<<this->current_bottom<<endl;
+    //zcout<<this->current_bottom<<endl;
     for(int line = this->current_top;line < this->current_bottom; line++){
-        file_folder file_or_folder = this->current_directory.all_files_folder[line];
-        cout<<file_or_folder.permissions<<" ";
+        file_folder file_or_folder = this->current_directory.all_files_folder[line-1];
+        cout << file_or_folder.permissions << " " ;
         string x = file_or_folder.user_name;
-        if(x.length()>8)x = x.substr(0,6)+"..";
-        cout<<std::left<<setw(8)<<x<<" ";
+        if (x.length() > 8 )x = x.substr(0,6)+"..";
+        cout << std::left << setw(8) << x << " " ;
         x = file_or_folder.group_name;
         if(x.length()>8)x = x.substr(0,6)+"..";
         cout<<std::left<<setw(8)<<x<<" ";
@@ -239,8 +240,29 @@ void screen :: fill_screen(){
         cout<<file_or_folder.name_of_file_or_folder<<endl;
         if(file_or_folder.is_folder())cout<<"\e[0m";
     }
-    cout<<endl;
-    cout<<this->current_bottom<<" "<<this->current_top;
+    cout<<"\e["<<this->x_pos<<";"<<y_pos<<"H";
+    //debug2(this->current_top,this->current_bottom);
+}
+void screen :: move_up(){
+    if(this->x_pos == 2){
+        this->current_top = max( this->current_top - 1 , 1 );
+    }
+    else{
+        this->x_pos --;
+    }
+    this->fill_screen();
+}
+void screen :: move_down(){
+    if(this->x_pos == number_of_rows-1){
+        if(this->current_top + number_of_rows - 1 <= this->current_directory.all_files_folder.size()){
+            //debug4(this->x_pos,this->current_top,this->number_of_rows,this->current_directory.all_files_folder.size());
+            this->current_top++;
+        }
+    }
+    else{
+        this->x_pos++;
+    }
+    this->fill_screen();
 }
 int main(int argc, char* argv[]){
     cout<<"\e[?1049h";
@@ -255,8 +277,28 @@ int main(int argc, char* argv[]){
     string home="";
     if(argc>=2 and argv[1]!=NULL)home = string(argv[1]);
     screen Screen(input,output,home);
-    int x;
-    cin>>x;
+    char choice;
+    do{
+        choice = fgetc(input);
+        if(choice == '\033'){
+            choice = fgetc(input);
+            if(choice == '['){
+                choice = fgetc(input);
+                if(choice == 'A'){
+                    Screen.move_up();
+                }
+                else if(choice =='B'){
+                    Screen.move_down();
+                }
+                else if(choice == 'C'){
+
+                }
+                else if(choice == 'D'){
+
+                }
+            }
+        }
+    }while(choice != 'q');
     Terminal.switch_to_non_canonical_mode();
     cout<<"\e[?1049l";
     return 0;
