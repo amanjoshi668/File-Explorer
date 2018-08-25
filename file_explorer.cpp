@@ -17,14 +17,14 @@ struct terminal{
     terminal (FILE *in, FILE *out);
 };
 terminal :: terminal(FILE *in, FILE *out){
-	tcgetattr(fileno(input), &this->initial_settings);
+	tcgetattr(fileno(in), &this->initial_settings);
     this->new_settings = this->initial_settings;
     this->input = in;
     this->output = out;
 }
 int terminal :: switch_to_canonical_mode(){
     new_settings.c_lflag &= ~ICANON;
-    new_settings.c_lflag &= ~ISIG;
+    //new_settings.c_lflag &= ~ISIG;
     new_settings.c_lflag &= ~ECHO;
     new_settings.c_cc[VMIN] = 1;
     new_settings.c_cc[VTIME] = 0;
@@ -71,7 +71,8 @@ bool file_folder :: is_folder(){
     return false; 
 }
 int file_folder :: get_stat(){
-    if(lstat(this->name_of_file_or_folder.c_str(), &(this->sb)) == -1){
+    if(this->name_of_file_or_folder.c_str() == NULL)cout<<"Let me know"<<endl;
+    if(stat(this->name_of_file_or_folder.c_str(), &(this->sb)) == -1){
         cerr<<"Cant't execute stat"<<this->name_of_file_or_folder<<endl;
         cerr<<this->name_of_file_or_folder.c_str()<<endl;
         return 1;
@@ -80,12 +81,12 @@ int file_folder :: get_stat(){
     group *grp;
     passwd *pwd;
     grp = getgrgid(this->sb.st_gid);
-    this->group_name = grp->gr_name;
+    this->group_name = string(grp->gr_name);
     //cout << grou
     pwd = getpwuid(this->sb.st_uid);
-    this->user_name = pwd->pw_name;
+    this->user_name = string(pwd->pw_name);
     //cout << user_name << " Debuf" << endl;
-    int x = this->sb.st_mode;
+    int x = (int)this->sb.st_mode;
     vector<int> temp;
     while(x>0){
         temp.push_back(x%8);
@@ -130,7 +131,7 @@ int file_folder :: get_stat(){
         else this->size = int(f);
         this->unit = "T";
     }
-    this->last_modified = ctime(&this->sb.st_mtime);
+    this->last_modified = string(ctime(&this->sb.st_mtime));
     return 0;
 }
 struct directory{
@@ -153,7 +154,7 @@ int directory :: open_directory(string name){
         return 1;
     }
     while((this->pDirent = readdir(this->direct)) != NULL)if(this->pDirent->d_name!=NULL){
-        string file_name (this->pDirent->d_name);
+        string file_name = string(this->pDirent->d_name);
         file_folder current(file_name, (int)this->pDirent->d_type);
         current.get_stat();
         this->all_files_folder.push_back(current);
@@ -182,12 +183,11 @@ struct screen{
     void fill_screen();
 };
 void screen :: flush(){
-    cout<<"e[2J";
-    cout<<endl;
+    cout<<"\e[2J";
     cout<<"\e[1;1H";
     this->x_pos = this->y_pos = 1;
 }
-screen :: screen(FILE *in, FILE *out, string home){
+screen :: screen(FILE *in, FILE *out, string home=""){
     this->normal = true;
     this->HOME = home;
     this->input = in;
@@ -211,16 +211,16 @@ void screen :: get_screen_size(){
     this->number_of_columns = (int)size.ws_col;
     this->current_top = 1;
     this->current_bottom = this->number_of_rows - 3;
-    //debug4(this->current_bottom,this->current_directory.all_files_folder.size(),this->number_of_columns,this->number_of_rows);
+    //cerr<<this->current_bottom<<" "<<this->number_of_rows<<" "<<this->current_directory.all_files_folder.size()<<endl;
     this->current_bottom = min(this->current_bottom ,(int) this->current_directory.all_files_folder.size()); 
     this->current_bottom += this->current_top;
 }
 void screen :: fill_screen(){
-    this->flush();
+    //this->flush();
     this->get_screen_size();
     cout<<"\e[1m"<<this->current_directory.current_directory<<"\e[0m"<<endl;
-    cout<<this->current_directory.all_files_folder.size()<<endl;
-    for(int line = current_top;line <= current_bottom ; line++){
+    //cout<<this->current_bottom<<endl;
+    for(int line = this->current_top;line < this->current_bottom; line++){
         file_folder file_or_folder = this->current_directory.all_files_folder[line];
         cout<<file_or_folder.permissions<<" ";
         string x = file_or_folder.user_name;
@@ -240,6 +240,7 @@ void screen :: fill_screen(){
         if(file_or_folder.is_folder())cout<<"\e[0m";
     }
     cout<<endl;
+    cout<<this->current_bottom<<" "<<this->current_top;
 }
 int main(int argc, char* argv[]){
     cout<<"\e[?1049h";
