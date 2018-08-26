@@ -7,6 +7,7 @@
 #include <pwd.h>
 #include <limits.h>
 #include <grp.h>
+#include <bits/stdc++.h>
 using namespace std;
 
 struct terminal{
@@ -16,12 +17,14 @@ struct terminal{
     int switch_to_canonical_mode();
     terminal (FILE *in, FILE *out);
 };
+
 terminal :: terminal(FILE *in, FILE *out){
 	tcgetattr(fileno(in), &this->initial_settings);
     this->new_settings = this->initial_settings;
     this->input = in;
     this->output = out;
 }
+
 int terminal :: switch_to_canonical_mode(){
     new_settings.c_lflag &= ~ICANON;
     //new_settings.c_lflag &= ~ISIG;
@@ -35,6 +38,7 @@ int terminal :: switch_to_canonical_mode(){
     }
     return 0;
 }
+
 void terminal :: switch_to_non_canonical_mode(){
     lo x = tcsetattr(fileno(input), TCSANOW, &initial_settings);
     if(x!=0){
@@ -45,36 +49,51 @@ void terminal :: switch_to_non_canonical_mode(){
     return ;
 }
 
+
+
 struct file_folder{
     string name_of_file_or_folder;
+    string name_of_file_or_folder_for_stat;
     int d_type;
     struct stat sb;
     string user_name,group_name;
     string permissions, last_modified;
     double size;
     string unit;
-    file_folder (string name, int type);
+    file_folder (string name, int type, string root);
     bool is_file();
     bool is_folder();
     int get_stat();
+    bool operator<( const file_folder &val ) const{
+        return this->name_of_file_or_folder < val.name_of_file_or_folder;
+    }
 };
-file_folder :: file_folder(string name, int type){
+
+file_folder :: file_folder(string name, int type, string root_path){
     this->name_of_file_or_folder = name;
     this->d_type = type;
+    this->name_of_file_or_folder_for_stat = root_path + "/" + name;
 }
+
 bool file_folder :: is_file(){
     if(d_type == 8)return true;
     return false; 
 }
+
 bool file_folder :: is_folder(){
     if(d_type == 4)return true;
     return false; 
 }
+
 int file_folder :: get_stat(){
-    if(this->name_of_file_or_folder.c_str() == NULL)cout<<"Let me know"<<endl;
-    if(stat(this->name_of_file_or_folder.c_str(), &(this->sb)) == -1){
-        cerr<<"Cant't execute stat"<<this->name_of_file_or_folder<<endl;
-        cerr<<this->name_of_file_or_folder.c_str()<<endl;
+    if(this->name_of_file_or_folder_for_stat.c_str() == NULL){
+        cout<<"Let me know"<<endl;
+    }
+    freopen("/home/aman/Documents/OS/file_explorer/error.txt", "w", stderr);
+    cerr << this->name_of_file_or_folder_for_stat << endl;
+    if(stat(this->name_of_file_or_folder_for_stat.c_str(), &(this->sb)) == -1){
+        cerr<<"Cant't execute stat"<<this->name_of_file_or_folder_for_stat<<endl;
+        cerr<<this->name_of_file_or_folder_for_stat.c_str()<<endl;
         return 1;
     }
     //cout << "Debug " << endl;
@@ -101,7 +120,9 @@ int file_folder :: get_stat(){
     convert_octal_permission[5] = "r-x";
     convert_octal_permission[6] = "rw-";
     convert_octal_permission[7] = "rwx";
-    this->permissions = convert_octal_permission[temp[2]]+convert_octal_permission[temp[1]]+convert_octal_permission[temp[0]];
+    if( this->is_file() ) this->permissions = ".";
+    else this->permissions = "d";
+    this->permissions += convert_octal_permission[temp[2]]+convert_octal_permission[temp[1]]+convert_octal_permission[temp[0]];
     long long size = this->sb.st_size;
     if(size<1024){
         this->size = size;
@@ -134,6 +155,9 @@ int file_folder :: get_stat(){
     this->last_modified = string(ctime(&this->sb.st_mtime));
     return 0;
 }
+
+
+
 struct directory{
     DIR *direct;
     dirent *pDirent;
@@ -142,10 +166,12 @@ struct directory{
     directory ();
     int open_directory(string name);
 };
+
 directory :: directory(){
     this->current_directory = "";
     all_files_folder.clear();
 }
+
 int directory :: open_directory(string name){
     this->current_directory = name;
     this->direct = opendir(name.c_str());
@@ -153,14 +179,19 @@ int directory :: open_directory(string name){
         cerr<<"Can't open Directory "<<name<<endl;
         return 1;
     }
+    this->all_files_folder.clear();
     while((this->pDirent = readdir(this->direct)) != NULL)if(this->pDirent->d_name!=NULL){
         string file_name = string(this->pDirent->d_name);
-        file_folder current(file_name, (int)this->pDirent->d_type);
+        file_folder current(file_name, (int)this->pDirent->d_type, this->current_directory);
         current.get_stat();
         this->all_files_folder.push_back(current);
     }
+    sort(all(this->all_files_folder));
     return 0;
 }
+
+
+
 struct screen{
     int x_pos, y_pos;
     int number_of_rows, number_of_columns;
@@ -181,11 +212,15 @@ struct screen{
     void move_home();
     void move_back();
     void fill_screen();
+    void move_into();
+    void change_directory(string,int);
 };
+
 void screen :: flush(){
     cout<<"\e[2J";
     cout<<"\e[1;1H";
 }
+
 screen :: screen(FILE *in, FILE *out, string home=""){
     this->normal = true;
     this->HOME = home;
@@ -206,6 +241,7 @@ screen :: screen(FILE *in, FILE *out, string home=""){
     this->history.push_back(this->HOME);
     this->fill_screen();
 }
+
 void screen :: get_screen_size(){
     struct winsize size;
     ioctl(fileno(this->input), TIOCGWINSZ, &size);
@@ -216,6 +252,7 @@ void screen :: get_screen_size(){
     this->current_bottom = min(this->current_bottom ,(int) this->current_directory.all_files_folder.size()); 
     this->current_bottom += this->current_top;
 }
+
 void screen :: fill_screen(){
     this->flush();
     this->get_screen_size();
@@ -225,24 +262,51 @@ void screen :: fill_screen(){
         file_folder file_or_folder = this->current_directory.all_files_folder[line-1];
         cout << file_or_folder.permissions << " " ;
         string x = file_or_folder.user_name;
-        if (x.length() > 8 )x = x.substr(0,6)+"..";
+        if (x.length() > 8 ){
+            x = x.substr(0,6)+"..";
+        }
         cout << std::left << setw(8) << x << " " ;
         x = file_or_folder.group_name;
-        if(x.length()>8)x = x.substr(0,6)+"..";
-        cout<<std::left<<setw(8)<<x<<" ";
-        if(file_or_folder.unit == "")cout<<left<<setw(6)<<file_or_folder.size<<" ";
+        if(x.length()>8){
+            x = x.substr(0,6)+"..";
+        }
+        cout << std::left << setw(8) << x << "  ";
+        if(file_or_folder.unit == ""){
+            cout<<left<<setw(6)<<file_or_folder.size<<" ";
+        }
         else {
             cout<<left<<setw(5)<<fixed<<setprecision(1)<<file_or_folder.size;
             cout<<file_or_folder.unit<<" ";
         }
         cout<<file_or_folder.last_modified.substr(0,24)<<" ";
-        if(file_or_folder.is_folder())cout<<"\e[2m";
+        if(file_or_folder.is_folder()){
+            cout<<"\e[2m";
+        }
         cout<<file_or_folder.name_of_file_or_folder<<endl;
-        if(file_or_folder.is_folder())cout<<"\e[0m";
+        if(file_or_folder.is_folder()){
+            cout<<"\e[0m";
+        }
     }
     cout<<"\e["<<this->x_pos<<";"<<y_pos<<"H";
-    //debug2(this->current_top,this->current_bottom);
+    debug4(this->current_top,this->current_bottom,this->x_pos, this->current_directory.all_files_folder.size());
 }
+
+void screen :: change_directory(string new_path, int position){
+    this->x_pos = 2;
+    this->current_top = 1;
+    this->y_pos = 1;
+    this->current_directory.open_directory(new_path);
+    this->current_position_in_history = position;
+    if (position == this->history.size()){
+        this->history.push_back(new_path);
+    }
+    this->fill_screen();
+    if(this->history.size()>INF){
+        history.pop_front();
+        this->current_position_in_history--;
+    }
+}
+
 void screen :: move_up(){
     if(this->x_pos == 2){
         this->current_top = max( this->current_top - 1 , 1 );
@@ -252,9 +316,10 @@ void screen :: move_up(){
     }
     this->fill_screen();
 }
+
 void screen :: move_down(){
-    if(this->x_pos == number_of_rows-1){
-        if(this->current_top + number_of_rows - 1 <= this->current_directory.all_files_folder.size()){
+    if(this->x_pos == this->number_of_rows - 1){
+        if(this->current_top + this->x_pos  <= this->current_directory.all_files_folder.size() + 1){
             //debug4(this->x_pos,this->current_top,this->number_of_rows,this->current_directory.all_files_folder.size());
             this->current_top++;
         }
@@ -264,6 +329,41 @@ void screen :: move_down(){
     }
     this->fill_screen();
 }
+
+void screen :: move_right(){
+    if(this->current_position_in_history  == this->history.size()-1)return;
+    this->change_directory(this->history[current_position_in_history+1], this->current_position_in_history + 1 );
+}
+
+void screen :: move_left(){
+    if(this->current_position_in_history  == 0)return;
+    this->change_directory(this->history[current_position_in_history-1] , this->current_position_in_history - 1 );
+}
+
+void screen :: move_home(){
+    this->change_directory(this->HOME , this->current_position_in_history + 1);
+}
+
+void screen :: move_back(){
+    if(this->current_directory.current_directory == this->HOME)return;
+    string new_path = this->current_directory.current_directory.substr(0, this->current_directory.current_directory.find_last_of("/"));
+    this->change_directory(new_path, this->current_position_in_history + 1);
+}
+
+void screen :: move_into(){
+    string path_name = this->current_directory.all_files_folder[ this->x_pos + this->current_top - 3 ].name_of_file_or_folder;
+    cout<<path_name;
+    if( path_name == "."){
+        return;
+    }
+    else if(path_name == ".."){
+        move_back();
+        return;
+    }
+    path_name = this->current_directory.current_directory + "/" + path_name;
+    this->change_directory( path_name, this->current_position_in_history + 1);
+}
+
 int main(int argc, char* argv[]){
     cout<<"\e[?1049h";
     FILE *input,*output;
@@ -291,14 +391,26 @@ int main(int argc, char* argv[]){
                     Screen.move_down();
                 }
                 else if(choice == 'C'){
-
+                    Screen.move_right();
                 }
                 else if(choice == 'D'){
-
+                    Screen.move_left();
+                }
+            }
+            else if(choice == '^'){
+                choice = fgetc(input);
+                if(choice == '?'){
+                    Screen.move_back();
                 }
             }
         }
-    }while(choice != 'q');
+        else if(choice == 'h' or choice =='H'){
+            Screen.move_home();
+        }
+        else if(choice == '\n' or choice == '\r'){
+            Screen.move_into();
+        }
+    }while(choice != 'q' and choice != 'Q');
     Terminal.switch_to_non_canonical_mode();
     cout<<"\e[?1049l";
     return 0;
