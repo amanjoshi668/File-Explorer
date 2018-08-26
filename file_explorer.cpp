@@ -194,6 +194,7 @@ int directory :: open_directory(string name){
 
 struct screen{
     int x_pos, y_pos;
+    int command_pos;
     int number_of_rows, number_of_columns;
     int current_top, current_bottom;
     int current_position_in_history;
@@ -214,6 +215,7 @@ struct screen{
     void fill_screen();
     void move_into();
     void change_directory(string,int);
+    void command_mode();
 };
 
 void screen :: flush(){
@@ -226,6 +228,7 @@ screen :: screen(FILE *in, FILE *out, string home=""){
     this->HOME = home;
     this->input = in;
     this->output = out;
+    this->command_pos = 1;
     if(home.empty()){
         char cwd[PATH_MAX];
         getcwd(cwd, sizeof(cwd));
@@ -286,6 +289,14 @@ void screen :: fill_screen(){
         if(file_or_folder.is_folder()){
             cout<<"\e[0m";
         }
+    }
+    cout<<"\e["<<this->number_of_rows<<";1H";
+    if(this->normal){
+        cout<<"Normal Mode";
+    }
+    else {
+        cout<<"Command Mode";
+        this->command_pos = 13;
     }
     cout<<"\e["<<this->x_pos<<";"<<y_pos<<"H";
     debug4(this->current_top,this->current_bottom,this->x_pos, this->current_directory.all_files_folder.size());
@@ -351,17 +362,27 @@ void screen :: move_back(){
 }
 
 void screen :: move_into(){
-    string path_name = this->current_directory.all_files_folder[ this->x_pos + this->current_top - 3 ].name_of_file_or_folder;
-    cout<<path_name;
-    if( path_name == "."){
-        return;
+    if (this->current_directory.all_files_folder[ this->x_pos + this->current_top - 3 ].is_folder()){
+        string path_name = this->current_directory.all_files_folder[ this->x_pos + this->current_top - 3 ].name_of_file_or_folder;
+        cout<<path_name;
+        if( path_name == "."){
+            return;
+        }
+        else if(path_name == ".."){
+            move_back();
+            return;
+        }
+        path_name = this->current_directory.current_directory + "/" + path_name;
+        this->change_directory( path_name, this->current_position_in_history + 1);
     }
-    else if(path_name == ".."){
-        move_back();
-        return;
+    else{
+
     }
-    path_name = this->current_directory.current_directory + "/" + path_name;
-    this->change_directory( path_name, this->current_position_in_history + 1);
+}
+
+void screen :: command_mode(){
+    cout<<"\e["<<this->number_of_rows<<";"<<this->command_pos<<"1H"<<" :";
+    command_pos += 2;
 }
 
 int main(int argc, char* argv[]){
@@ -397,18 +418,18 @@ int main(int argc, char* argv[]){
                     Screen.move_left();
                 }
             }
-            else if(choice == '^'){
-                choice = fgetc(input);
-                if(choice == '?'){
-                    Screen.move_back();
-                }
-            }
         }
         else if(choice == 'h' or choice =='H'){
             Screen.move_home();
         }
         else if(choice == '\n' or choice == '\r'){
             Screen.move_into();
+        }
+        else if((int)choice == 127){
+            Screen.move_back();
+        }
+        else if(choice == ':'){
+            Screen.normal = false;
         }
     }while(choice != 'q' and choice != 'Q');
     Terminal.switch_to_non_canonical_mode();
