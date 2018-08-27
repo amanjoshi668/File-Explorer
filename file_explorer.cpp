@@ -89,7 +89,6 @@ int file_folder :: get_stat(){
     if(this->name_of_file_or_folder_for_stat.c_str() == NULL){
         cout<<"Let me know"<<endl;
     }
-    freopen("/home/aman/Documents/OS/file_explorer/error.txt", "w", stderr);
     cerr << this->name_of_file_or_folder_for_stat << endl;
     if(stat(this->name_of_file_or_folder_for_stat.c_str(), &(this->sb)) == -1){
         cerr<<"Cant't execute stat"<<this->name_of_file_or_folder_for_stat<<endl;
@@ -295,11 +294,12 @@ void screen :: fill_screen(){
         cout<<"Normal Mode";
     }
     else {
-        cout<<"Command Mode";
-        this->command_pos = 13;
+        cout<<"\e["<<this->number_of_rows<<";1H";
+        cout<<"Command Mode \e["<<this->number_of_rows<<";"<<this->command_pos<<"H"<<" :";
+        this->command_pos += 2;
     }
     cout<<"\e["<<this->x_pos<<";"<<y_pos<<"H";
-    debug4(this->current_top,this->current_bottom,this->x_pos, this->current_directory.all_files_folder.size());
+    //debug4(this->current_top,this->current_bottom,this->x_pos, this->current_directory.all_files_folder.size());
 }
 
 void screen :: change_directory(string new_path, int position){
@@ -329,6 +329,9 @@ void screen :: move_up(){
 }
 
 void screen :: move_down(){
+    if(this->current_top + this->x_pos > this->current_directory.all_files_folder.size() + 1){
+        return ;
+    }
     if(this->x_pos == this->number_of_rows - 1){
         if(this->current_top + this->x_pos  <= this->current_directory.all_files_folder.size() + 1){
             //debug4(this->x_pos,this->current_top,this->number_of_rows,this->current_directory.all_files_folder.size());
@@ -362,6 +365,7 @@ void screen :: move_back(){
 }
 
 void screen :: move_into(){
+    freopen("/home/aman/Documents/OS/file_explorer/error.txt", "w", stderr);
     if (this->current_directory.all_files_folder[ this->x_pos + this->current_top - 3 ].is_folder()){
         string path_name = this->current_directory.all_files_folder[ this->x_pos + this->current_top - 3 ].name_of_file_or_folder;
         cout<<path_name;
@@ -376,16 +380,30 @@ void screen :: move_into(){
         this->change_directory( path_name, this->current_position_in_history + 1);
     }
     else{
-
+        pid_t pid;
+        pid = fork();
+        if(pid == 0){
+            //Execute the file;
+            string file_to_execute = this->current_directory.all_files_folder[this->x_pos + this->current_top - 3].name_of_file_or_folder_for_stat ;
+            cerr<<"/usr/bin/xdg-open"<< file_to_execute<<endl;
+            execl("/usr/bin/xdg-open", "xdg-open", file_to_execute.c_str(), NULL);
+        }
+        else if(pid < 0){
+            cerr<<"Failed to fork"<<endl;
+        }
+        else return;
     }
 }
 
 void screen :: command_mode(){
-    cout<<"\e["<<this->number_of_rows<<";"<<this->command_pos<<"1H"<<" :";
-    command_pos += 2;
+    cout<<"\e["<<this->number_of_rows<<";1H";
+    this->command_pos = 13;
+    cout<<"Command Mode \e["<<this->number_of_rows<<";"<<this->command_pos<<"H"<<" :";
+    this->command_pos += 2;
 }
 
 int main(int argc, char* argv[]){
+    freopen("/home/aman/Documents/OS/file_explorer/error.txt", "w", stderr);
     cout<<"\e[?1049h";
     FILE *input,*output;
     input = fopen("/dev/tty","r");
@@ -430,6 +448,7 @@ int main(int argc, char* argv[]){
         }
         else if(choice == ':'){
             Screen.normal = false;
+            Screen.command_mode();
         }
     }while(choice != 'q' and choice != 'Q');
     Terminal.switch_to_non_canonical_mode();
