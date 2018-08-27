@@ -189,7 +189,48 @@ int directory :: open_directory(string name){
     return 0;
 }
 
+struct command{
+    string full_command;
+    string command;
+    vector<string> arguments;
+    int take_command_input(FILE *input, FILE *output, int command_pos, int number_of_rows);
+    void execute_command();
+};
 
+void command :: execute_command(){
+    istringstream iss(this->full_command);
+    iss>>this->command;
+    string temp;
+    while(iss >> temp){
+        this->arguments.push_back(temp);
+    }
+}
+
+int command :: take_command_input(FILE *input, FILE *output, int command_pos, int number_of_rows){
+    this->full_command = "";
+    char choice;
+    do{
+        choice = fgetc(input);
+        if(choice == '\n' or choice == '\r'){
+            this->execute_command(); 
+            return 0;
+        }
+        else if(choice == '\e'){
+            return 1;
+        }
+        else if((int) choice == 128 ){
+            cout<<"\e["<<number_of_rows<<";"<<command_pos-1<<"H"<<" "<<"\e["<<number_of_rows<<";"<<command_pos-1<<"H"<<" ";
+            this->full_command.pop_back();
+            command_pos--;
+        }
+        else {
+            this->full_command+=choice;
+            cout<<choice;
+            command_pos++;
+        }
+    }while(1);
+    return 0;
+}
 
 struct screen{
     int x_pos, y_pos;
@@ -198,6 +239,7 @@ struct screen{
     int current_top, current_bottom;
     int current_position_in_history;
     bool normal;
+    command Command;
     string HOME;
     deque<string> history;
     directory current_directory;
@@ -215,7 +257,93 @@ struct screen{
     void move_into();
     void change_directory(string,int);
     void command_mode();
+    void execute_command();
+    void create_dir();
+    void create_file();
 };
+
+void screen :: create_dir(){
+    struct stat st = {0};
+    string pathname = "";
+    if(this->Command.arguments[1]=="."){
+        pathname = this->current_directory.current_directory;
+    }
+    else {
+        pathname = this->Command.arguments[1];
+    }
+    pathname = pathname + "/" + this->Command.arguments[0];
+    if(stat(pathname.c_str(), &st) != -1){
+        cerr<<"The Folder name already exists"<<endl;
+    }
+    mkdir(pathname.c_str(),0700);
+    this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
+}
+
+void screen :: create_file(){
+    struct stat st = {0};
+    string pathname = "";
+    if(this->Command.arguments[1]=="."){
+        pathname = this->current_directory.current_directory;
+    }
+    else {
+        pathname = this->Command.arguments[1];
+    }
+    pathname = pathname + "/" + this->Command.arguments[0];
+    auto fp = fopen(pathname.c_str(),"a");
+    this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
+}
+
+void screen :: execute_command(){
+    if(this->Command.command == "copy"){
+        //do copy;
+        cout<<"I am copying";
+    }
+    else if(this->Command.command == "move"){
+        //do move;
+        cout<<"I am moving";
+    }
+    else if(this->Command.command == "rename"){
+        //do rename;
+        cout<<"I am renaming";
+    }
+    else if(this->Command.command == "create_file"){
+        this->create_file();
+        //cout<<"I am ‘:create_file";
+    }
+    else if(this->Command.command == "create_dir"){
+        this->create_dir();
+        //cout<<"I am ‘:create_dir";
+    }
+    else if(this->Command.command == "delete"){
+        //do delete;
+        cout<<"I am deleting";
+    }
+    else if(this->Command.command == "goto"){
+        //do goto;
+        cout<<"I am goto";
+    }
+    else if(this->Command.command == "search"){
+        //do search;
+        cout<<"I am searching";
+    }else if(this->Command.command == "snapshot"){
+        //do snapshot;
+        cout<<"I am snapshoting";
+    }
+}
+
+void screen :: command_mode(){
+    cout<<"\e["<<this->number_of_rows<<";1H";
+    this->command_pos = 13;
+    cout<<"Command Mode \e["<<this->number_of_rows<<";"<<this->command_pos<<"H"<<" :";
+    this->command_pos += 2;
+    if(this->Command.take_command_input(this->input, this->output, this->command_pos, this->number_of_rows) != 0){
+        this->normal = true;
+        this->fill_screen();
+        return;
+    }
+    //debug2(this->Command.command,this->Command.arguments);
+    this->execute_command();
+}
 
 void screen :: flush(){
     cout<<"\e[2J";
@@ -395,12 +523,8 @@ void screen :: move_into(){
     }
 }
 
-void screen :: command_mode(){
-    cout<<"\e["<<this->number_of_rows<<";1H";
-    this->command_pos = 13;
-    cout<<"Command Mode \e["<<this->number_of_rows<<";"<<this->command_pos<<"H"<<" :";
-    this->command_pos += 2;
-}
+
+
 
 int main(int argc, char* argv[]){
     freopen("/home/aman/Documents/OS/file_explorer/error.txt", "w", stderr);
