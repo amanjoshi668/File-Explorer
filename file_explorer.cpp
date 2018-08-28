@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <grp.h>
 #include <bits/stdc++.h>
+#include <fcntl.h>
 using namespace std;
 
 struct terminal{
@@ -89,10 +90,10 @@ int file_folder :: get_stat(){
     if(this->name_of_file_or_folder_for_stat.c_str() == NULL){
         cout<<"Let me know"<<endl;
     }
-    cerr << this->name_of_file_or_folder_for_stat << endl;
+    //cerr << this->name_of_file_or_folder_for_stat << endl;
     if(stat(this->name_of_file_or_folder_for_stat.c_str(), &(this->sb)) == -1){
         cerr<<"Cant't execute stat"<<this->name_of_file_or_folder_for_stat<<endl;
-        cerr<<this->name_of_file_or_folder_for_stat.c_str()<<endl;
+        //cerr<<this->name_of_file_or_folder_for_stat.c_str()<<endl;
         return 1;
     }
     //cout << "Debug " << endl;
@@ -258,24 +259,136 @@ struct screen{
     void change_directory(string,int);
     void command_mode();
     void execute_command();
-    void create_dir();
+    void create_dir(string, __mode_t);
     void create_file();
+    void copy();
+    void copy_file(string, string);
+    void recursive_copy(string, string);
+    void recursive_delete(string);
+    void __delete();
 };
 
-void screen :: create_dir(){
+void screen :: recursive_copy(string source, string destination){
+    struct stat tmp ={0};
+    if(stat(source.c_str(), &tmp) == -1){
+        cerr<<"Cant't execute stat"<<source<<endl;
+        return ;
+    }
+    if (!S_ISDIR(tmp.st_mode)){
+        this->copy_file(source, destination);
+        return;
+    }
+    else {
+        cerr<<"Can't execute the stat "<<source;
+    }
+    DIR *direct = opendir(source.c_str());
+    if(direct == NULL){
+        cerr<<"Can't open Directory "<<source<<endl;
+        return ;
+    }
+    dirent *pDirent;
+    this->create_dir(destination, tmp.st_mode);
+    while((pDirent = readdir(direct)) != NULL)if(string(pDirent->d_name)!="." and string(pDirent->d_name)!=".."){
+        string file_name = "/" + string(pDirent->d_name);
+        string source_file_name = source + file_name;
+        string destination_file_name = destination + file_name;
+        recursive_copy(source_file_name, destination_file_name);
+    }
+    return ;
+}
+
+void screen :: copy(){
+    string destination = this->Command.arguments.back();
+    destination = destination.substr(1,destination.size()-1);
+    destination = this->HOME + destination;
+    for(int i=0;i<this->Command.arguments.size()-1 ;i++){
+        string source = this->current_directory.current_directory + "/" + this->Command.arguments[i];
+        string destination_file = destination + "/" + this->Command.arguments[i];
+        //derr2(source,destination_file);
+        recursive_copy(source, destination_file);
+    }   
+}
+
+void screen :: __delete(){
+    string source = this->Command.arguments[0];
+    source = source.substr(1,source.size()-1);
+    source = this->HOME + source;
+    recursive_delete(source);
+    this->normal = true;
+    this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
+}
+void screen :: recursive_delete(string source){
+    //derr(source);
+    struct stat tmp ={0};
+    if(stat(source.c_str(), &tmp) == -1){
+        cerr<<"Cant't execute stat"<<source<<endl;
+        return ;
+    }
+    int x = stat(source.c_str(),&tmp);
+    if (!S_ISDIR(tmp.st_mode)){
+        int x = unlink(source.c_str());
+        if(x!=0){
+            cerr<<"Can't delete file "<<source<<endl;
+        }
+        return;
+    }
+    DIR *direct = opendir(source.c_str());
+    if(direct == NULL){
+        cerr<<"Can't open Directory "<<source<<endl;
+        return ;
+    }
+    dirent *pDirent;
+    while((pDirent = readdir(direct)) != NULL)if(string(pDirent->d_name)!="." and string(pDirent->d_name)!=".."){
+        string file_name = "/" + string(pDirent->d_name);
+        string source_file_name = source + file_name;
+        recursive_delete(source_file_name);
+    }
+    x = rmdir(source.c_str());
+    if(x!=0){
+        cerr<<"Can't delete file "<<source<<endl;
+    }
+    return;
+}
+
+void screen :: copy_file(string source, string destination){
+    struct stat tmp ={0};
+    stat(source.c_str(),&tmp);
+    int in_fd = open(source.c_str(), O_RDONLY);
+    int out_fd = creat(destination.c_str(), tmp.st_mode);
+    //chmod(destination.c_str(), tmp.st_mode);
+    if(in_fd ==-1 or out_fd == -1){
+        cerr<<"Can't open files"<<endl;
+        return;
+    }
+    char buff[BUFFERSIZE];
+    int n_chars;
+    while( (n_chars = read(in_fd, buff, BUFFERSIZE)) > 0 ){
+        if( write(out_fd, buff, n_chars) != n_chars ){
+            cerr<<"Write error to "<<destination<<endl;
+        }    
+        if( n_chars == -1 ){
+            cerr<<"Read error from "<<source<<endl;
+        }
+    }
+}
+
+void screen :: create_dir(string directory="", __mode_t t = 0700){
     struct stat st = {0};
     string pathname = "";
     if(this->Command.arguments[1]=="."){
         pathname = this->current_directory.current_directory;
     }
     else {
-        pathname = this->Command.arguments[1];
+        pathname = this->HOME + this->Command.arguments[1].substr(1,this->Command.arguments[1].size()-1);
     }
     pathname = pathname + "/" + this->Command.arguments[0];
+    if(!directory.empty()){
+        pathname = directory;
+    }
     if(stat(pathname.c_str(), &st) != -1){
         cerr<<"The Folder name already exists"<<endl;
     }
-    mkdir(pathname.c_str(),0700);
+    mkdir(pathname.c_str(),t);
     this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
 }
 
@@ -286,7 +399,7 @@ void screen :: create_file(){
         pathname = this->current_directory.current_directory;
     }
     else {
-        pathname = this->Command.arguments[1];
+        pathname = this->HOME + this->Command.arguments[1].substr(1,this->Command.arguments[1].size()-1);
     }
     pathname = pathname + "/" + this->Command.arguments[0];
     auto fp = fopen(pathname.c_str(),"a");
@@ -295,11 +408,11 @@ void screen :: create_file(){
 
 void screen :: execute_command(){
     if(this->Command.command == "copy"){
-        //do copy;
-        cout<<"I am copying";
+        this->copy();
     }
     else if(this->Command.command == "move"){
         //do move;
+        this->copy();
         cout<<"I am moving";
     }
     else if(this->Command.command == "rename"){
@@ -314,9 +427,9 @@ void screen :: execute_command(){
         this->create_dir();
         //cout<<"I am ‘:create_dir";
     }
-    else if(this->Command.command == "delete"){
+    else if(this->Command.command == "delete_file" or this->Command.command == "delete_dir"){
         //do delete;
-        cout<<"I am deleting";
+        this->__delete();
     }
     else if(this->Command.command == "goto"){
         //do goto;
@@ -343,6 +456,7 @@ void screen :: command_mode(){
     }
     //debug2(this->Command.command,this->Command.arguments);
     this->execute_command();
+    this->normal=true;
 }
 
 void screen :: flush(){
@@ -493,7 +607,7 @@ void screen :: move_back(){
 }
 
 void screen :: move_into(){
-    freopen("/home/aman/Documents/OS/file_explorer/error.txt", "w", stderr);
+    //freopen("/home/aman/Documents/OS/file_explorer/error.txt", "w", stderr);
     if (this->current_directory.all_files_folder[ this->x_pos + this->current_top - 3 ].is_folder()){
         string path_name = this->current_directory.all_files_folder[ this->x_pos + this->current_top - 3 ].name_of_file_or_folder;
         cout<<path_name;
