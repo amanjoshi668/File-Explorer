@@ -269,6 +269,8 @@ struct screen{
     void move();
     void rename();
     void goto_location();
+    void snapshot();
+    void recursive_snapshot(string, string, string);
 };
 
 void screen :: recursive_copy(string source, string destination){
@@ -296,6 +298,59 @@ void screen :: recursive_copy(string source, string destination){
         string source_file_name = source + file_name;
         string destination_file_name = destination + file_name;
         recursive_copy(source_file_name, destination_file_name);
+    }
+    return ;
+}
+
+void screen :: snapshot(){
+    string source = this->Command.arguments[0];
+    source = this->current_directory.current_directory + "/" + source;
+    string write_file = this->current_directory.current_directory + "/" + this->Command.arguments[1];
+    struct stat tmp ={0};
+    if(stat(write_file.c_str(), &tmp) != -1){
+        int x = unlink(write_file.c_str());
+        //cerr<<"Cant't execute stat"<<source<<endl;
+        //return ;
+    }
+    recursive_snapshot(source, write_file, ".");
+    this->normal = true;
+    this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
+}
+
+void screen :: recursive_snapshot(string source, string destination, string current){
+    struct stat tmp ={0};
+    if(stat(source.c_str(), &tmp) == -1){
+        cerr<<"Cant't execute stat"<<source<<endl;
+        return ;
+    }
+    if (!S_ISDIR(tmp.st_mode)){
+        return;
+    }
+    else {
+        cerr<<"Can't execute the stat "<<source;
+    }
+    DIR *direct = opendir(source.c_str());
+    if(direct == NULL){
+        cerr<<"Can't open Directory "<<source<<endl;
+        return ;
+    }
+    ofstream out(destination,ios :: app);
+    out<<current<<" :"<<endl;
+    dirent *pDirent;
+    this->create_dir(destination, tmp.st_mode);
+    while((pDirent = readdir(direct)) != NULL)if(string(pDirent->d_name)!="." and string(pDirent->d_name)!=".."){
+        out<<string(pDirent->d_name)<<" ";
+    }
+    out<<endl<<endl;
+    closedir(direct);
+    out.close();
+
+    direct = opendir(source.c_str());
+    while((pDirent = readdir(direct)) != NULL)if(string(pDirent->d_name)!="." and string(pDirent->d_name)!=".."){
+        string file_name = "/" + string(pDirent->d_name);
+        string source_file_name = source + file_name;
+        string current_file_name = current + file_name;
+        recursive_snapshot(source_file_name, destination, current_file_name);
     }
     return ;
 }
@@ -465,7 +520,7 @@ void screen :: execute_command(){
         cout<<"I am searching";
     }else if(this->Command.command == "snapshot"){
         //do snapshot;
-        cout<<"I am snapshoting";
+        this->snapshot();
     }
 }
 
