@@ -266,6 +266,8 @@ struct screen{
     void recursive_copy(string, string);
     void recursive_delete(string);
     void __delete();
+    void move();
+    void rename();
 };
 
 void screen :: recursive_copy(string source, string destination){
@@ -405,15 +407,26 @@ void screen :: create_file(){
     auto fp = fopen(pathname.c_str(),"a");
     this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
 }
+void screen :: move(){
+    string destination = this->Command.arguments.back();
+    destination = destination.substr(1,destination.size()-1);
+    destination = this->HOME + destination;
+    for(int i=0;i<this->Command.arguments.size()-1 ;i++){
+        string source = this->current_directory.current_directory + "/" + this->Command.arguments[i];
+        string destination_file = destination + "/" + this->Command.arguments[i];
+        //derr2(source,destination_file);
+        recursive_copy(source, destination_file);
+        recursive_delete(source);
+    }   
+}
+
 
 void screen :: execute_command(){
     if(this->Command.command == "copy"){
         this->copy();
     }
     else if(this->Command.command == "move"){
-        //do move;
-        this->copy();
-        cout<<"I am moving";
+        this->move();
     }
     else if(this->Command.command == "rename"){
         //do rename;
