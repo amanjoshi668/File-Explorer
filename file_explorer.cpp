@@ -391,6 +391,7 @@ void screen :: create_dir(string directory="", __mode_t t = 0700){
         cerr<<"The Folder name already exists"<<endl;
     }
     mkdir(pathname.c_str(),t);
+    this->normal = true;
     this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
 }
 
@@ -405,6 +406,7 @@ void screen :: create_file(){
     }
     pathname = pathname + "/" + this->Command.arguments[0];
     auto fp = fopen(pathname.c_str(),"a");
+    this->normal = true;
     this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
 }
 void screen :: move(){
@@ -418,8 +420,19 @@ void screen :: move(){
         recursive_copy(source, destination_file);
         recursive_delete(source);
     }   
+    this->normal = true;
+    this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
 }
 
+void screen :: rename(){
+    string destination = this->current_directory.current_directory + "/";
+    string source = destination + this->Command.arguments[0];
+    destination += this->Command.arguments[1];
+    recursive_copy(source,destination);
+    recursive_delete(source);
+    this->normal = true;
+    this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
+}
 
 void screen :: execute_command(){
     if(this->Command.command == "copy"){
@@ -429,8 +442,7 @@ void screen :: execute_command(){
         this->move();
     }
     else if(this->Command.command == "rename"){
-        //do rename;
-        cout<<"I am renaming";
+        this->rename();
     }
     else if(this->Command.command == "create_file"){
         this->create_file();
