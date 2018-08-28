@@ -268,6 +268,7 @@ struct screen{
     void __delete();
     void move();
     void rename();
+    void goto_location();
 };
 
 void screen :: recursive_copy(string source, string destination){
@@ -457,8 +458,7 @@ void screen :: execute_command(){
         this->__delete();
     }
     else if(this->Command.command == "goto"){
-        //do goto;
-        cout<<"I am goto";
+        this->goto_location();
     }
     else if(this->Command.command == "search"){
         //do search;
@@ -592,6 +592,7 @@ void screen :: move_up(){
     else{
         this->x_pos --;
     }
+    this->normal = true;
     this->fill_screen();
 }
 
@@ -608,26 +609,31 @@ void screen :: move_down(){
     else{
         this->x_pos++;
     }
+    this->normal = true;
     this->fill_screen();
 }
 
 void screen :: move_right(){
     if(this->current_position_in_history  == this->history.size()-1)return;
+    this->normal = true;
     this->change_directory(this->history[current_position_in_history+1], this->current_position_in_history + 1 );
 }
 
 void screen :: move_left(){
     if(this->current_position_in_history  == 0)return;
+    this->normal = true;
     this->change_directory(this->history[current_position_in_history-1] , this->current_position_in_history - 1 );
 }
 
 void screen :: move_home(){
+    this->normal = true;
     this->change_directory(this->HOME , this->current_position_in_history + 1);
 }
 
 void screen :: move_back(){
     if(this->current_directory.current_directory == this->HOME)return;
     string new_path = this->current_directory.current_directory.substr(0, this->current_directory.current_directory.find_last_of("/"));
+    this->normal = true;
     this->change_directory(new_path, this->current_position_in_history + 1);
 }
 
@@ -644,6 +650,7 @@ void screen :: move_into(){
             return;
         }
         path_name = this->current_directory.current_directory + "/" + path_name;
+        this->normal = true;
         this->change_directory( path_name, this->current_position_in_history + 1);
     }
     else{
@@ -658,11 +665,28 @@ void screen :: move_into(){
         else if(pid < 0){
             cerr<<"Failed to fork"<<endl;
         }
-        else return;
+        else {
+            this->normal = true;
+            this->fill_screen();
+            return;
+        }
     }
 }
 
-
+void screen :: goto_location(){
+    if(this->Command.arguments[0] == "/"){
+        this->normal = true;
+        this->change_directory(this->HOME, this->current_position_in_history + 1);
+        return;
+    }
+    //derr(this->Command.arguments);
+    string destination = this->Command.arguments[0];
+    destination = destination.substr(1,destination.size()-1);
+    destination = this->HOME + destination;
+    this->normal = true;
+    this->change_directory(destination, this->current_position_in_history + 1);
+    return;
+}
 
 
 int main(int argc, char* argv[]){
