@@ -199,6 +199,7 @@ struct command{
 };
 
 void command :: execute_command(){
+    cerr<<this->full_command<<endl;
     istringstream iss(this->full_command);
     iss>>this->command;
     string temp;
@@ -219,8 +220,8 @@ int command :: take_command_input(FILE *input, FILE *output, int command_pos, in
         else if(choice == '\e'){
             return 1;
         }
-        else if((int) choice == 128 ){
-            cout<<"\e["<<number_of_rows<<";"<<command_pos-1<<"H"<<" "<<"\e["<<number_of_rows<<";"<<command_pos-1<<"H"<<" ";
+        else if((int) choice == 127 ){
+            cout<<"\e["<<number_of_rows<<";"<<command_pos-1<<"H"<<" "<<"\e["<<number_of_rows<<";"<<command_pos-1<<"H";
             this->full_command.pop_back();
             command_pos--;
         }
@@ -522,6 +523,8 @@ void screen :: execute_command(){
         //do snapshot;
         this->snapshot();
     }
+    this->normal = true;
+    this->fill_screen();
 }
 
 void screen :: command_mode(){
