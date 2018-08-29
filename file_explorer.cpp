@@ -756,7 +756,12 @@ void screen :: create_file(){
         pathname = this->HOME + this->Command.arguments[1].substr(1,this->Command.arguments[1].size()-1);
     }
     pathname = pathname + "/" + this->Command.arguments[0];
-    auto fp = fopen(pathname.c_str(),"a");
+    derr(pathname);
+    int out_fd = creat(pathname.c_str(), __mode_t(0700));
+    if(out_fd == -1){
+        cerr<<"Can't open files"<<endl;
+        return;
+    }
 }
 void screen :: move(){
     string destination = this->Command.arguments.back();
