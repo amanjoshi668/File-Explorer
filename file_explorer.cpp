@@ -205,6 +205,7 @@ struct command{
     void execute_command();
 };
 
+/*
 void command :: execute_command(){
     //cerr<<this->full_command<<endl;
     istringstream iss(this->full_command);
@@ -212,6 +213,57 @@ void command :: execute_command(){
     string temp;
     while(iss >> temp){
         this->arguments.push_back(temp);
+    }
+}
+*/
+
+void command :: execute_command(){
+    istringstream iss(this->full_command);
+    iss>>this->command;
+    string temp;
+    string full_command_space="";
+    while(iss >> temp){
+        //iss>>temp;derr(temp);
+        full_command_space += " "+temp;
+    }
+    bool slash = false;
+    bool quote = false;
+    string current="";
+    for(int i=1;i<full_command_space.length();i++){
+        if(full_command_space[i]=='\\'){
+            if(slash){
+                current += "\\";
+                slash = false;
+            }
+            else {
+                slash = true;
+            }
+        }
+        else if(full_command_space[i] == '\''){
+            if(slash){
+                current += "'";
+                slash = false;
+            }
+            else if(!quote){
+                quote = true;
+            }
+            else {
+                this->arguments.push_back(current);
+                current = "";
+                quote = false;
+                i++;
+            }
+        }
+        else if(full_command_space[i]==' ' and !quote){
+            this->arguments.push_back(current);
+            current = "";
+        }
+        else {
+            current += full_command_space[i];
+        }            
+    }
+    if(!current.empty()){
+        this->arguments.push_back(current);
     }
 }
 
@@ -321,7 +373,7 @@ void screen :: search(string source="", string file_name=""){
     }
     string new_name = "Search results of " + file_name + " in " + source;
     vector<string> search_results;
-    derr2(source,file_name);
+    //derr2(source,file_name);
     recursive_search(source, file_name, search_results);
     this->x_pos = 2;
     this->current_top = 1;
@@ -756,7 +808,7 @@ void screen :: create_file(){
         pathname = this->HOME + this->Command.arguments[1].substr(1,this->Command.arguments[1].size()-1);
     }
     pathname = pathname + "/" + this->Command.arguments[0];
-    derr(pathname);
+    //derr(pathname);
     int out_fd = creat(pathname.c_str(), __mode_t(0700));
     if(out_fd == -1){
         cerr<<"Can't open files"<<endl;
@@ -841,12 +893,8 @@ void screen :: command_mode(){
         this->fill_screen();
         return ;
     }
-    cerr<<endl;
-    derr2(this->Command.command, this->Command.arguments);
-    cerr<<endl;
     this->execute_command();
 }
-
 
 int main(int argc, char* argv[]){
     freopen("/home/aman/Documents/OS/file_explorer/error.txt", "w", stderr);
