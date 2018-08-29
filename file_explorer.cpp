@@ -528,6 +528,9 @@ void screen :: move_into(){
         if(!isSearch)path_name = this->current_directory.current_directory + "/" + path_name;
         this->normal = true;
         this->isSearch = false;
+        while(this->history.size() > this->current_position_in_history + 1){
+            history.pop_back();
+        }
         this->change_directory( path_name, this->current_position_in_history + 1);
     }
     else{
@@ -551,6 +554,9 @@ void screen :: move_into(){
 }
 
 void screen :: goto_location(){
+    while(this->history.size() > this->current_position_in_history + 1){
+        history.pop_back();
+    }
     this->isSearch = false;
     if(this->Command.arguments[0] == "/"){
         this->normal = true;
@@ -585,13 +591,14 @@ void screen :: recursive_copy(string source, string destination){
         return ;
     }
     dirent *pDirent;
-    this->create_dir(destination, tmp.st_mode);
+    this->create_dir(destination, 0700);
     while((pDirent = readdir(direct)) != NULL)if(string(pDirent->d_name)!="." and string(pDirent->d_name)!=".."){
         string file_name = "/" + string(pDirent->d_name);
         string source_file_name = source + file_name;
         string destination_file_name = destination + file_name;
         recursive_copy(source_file_name, destination_file_name);
     }
+    chmod(destination.c_str(), tmp.st_mode);
     return ;
 }
 
@@ -702,8 +709,7 @@ void screen :: copy_file(string source, string destination){
     struct stat tmp ={0};
     stat(source.c_str(),&tmp);
     int in_fd = open(source.c_str(), O_RDONLY);
-    int out_fd = creat(destination.c_str(), tmp.st_mode);
-    //chmod(destination.c_str(), tmp.st_mode);
+    int out_fd = creat(destination.c_str(), __mode_t(0700));
     if(in_fd ==-1 or out_fd == -1){
         cerr<<"Can't open files"<<endl;
         return;
@@ -718,6 +724,7 @@ void screen :: copy_file(string source, string destination){
             cerr<<"Read error from "<<source<<endl;
         }
     }
+    chmod(destination.c_str(), tmp.st_mode);
 }
 
 void screen :: create_dir(string directory="", __mode_t t = 0700){
@@ -818,6 +825,8 @@ void screen :: execute_command(){
 }
 
 void screen :: command_mode(){
+    this->Command.command.clear();
+    this->Command.arguments.clear();
     cout<<"\e["<<this->number_of_rows<<";1H";
     this->command_pos = 13;
     cout<<"Command Mode \e["<<this->number_of_rows<<";"<<this->command_pos<<"H"<<" :";
@@ -827,6 +836,9 @@ void screen :: command_mode(){
         this->fill_screen();
         return ;
     }
+    cerr<<endl;
+    derr2(this->Command.command, this->Command.arguments);
+    cerr<<endl;
     this->execute_command();
 }
 
