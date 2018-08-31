@@ -539,9 +539,11 @@ void screen :: fill_screen(){
     else{
         cout<<"\e[1m"<<this->search_title<<"\e[0m"<<endl;
     }
+    int width = to_string(this->current_directory.all_files_folder.size()).length();
     //zcout<<this->current_bottom<<endl;
     for(int line = this->current_top;line < this->current_bottom; line++){
         file_folder file_or_folder = this->current_directory.all_files_folder[line-1];
+        cout << std::left << setw(width) << line << "  ";
         cout << file_or_folder.permissions << " " ;
         string x = file_or_folder.user_name;
         if (x.length() > 8 ){
