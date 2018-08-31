@@ -11,16 +11,77 @@
 #include <fcntl.h>
 using namespace std;
 
+struct error{
+    static bool is_error;
+    static bool instanceFlag;
+    static string error_code;
+    static bool error_printed;
+    static error *Single;
+    void print_error(bool normal, int number_of_rows);
+    void remove_error(bool normal, int number_of_rows);
+    static error* getInstance();
+};
+bool error :: is_error;
+bool error :: instanceFlag;
+bool error :: error_printed;
+error* error :: Single; 
+string error :: error_code;
+void error :: print_error(bool normal, int number_of_rows){
+    cout<<"\e["<<number_of_rows<<";1H";
+    if(normal){
+        cout<<"Normal Mode";
+        cout<<"\e[1m"<<": ERROR"<<this->error_code<<"\e[0m";
+    }
+    else { 
+        cout<<"Command Mode";
+        cout<<"\e[1m"<<": ERROR"<<this->error_code<<"\e[0m";
+    }
+    this->error_code = "";
+    this->is_error = false;
+    this->error_printed = true;
+}
+void error :: remove_error(bool normal, int number_of_rows){
+    cout<<"\e["<<number_of_rows<<";1H";
+    cout<<"\e[2K";
+    if(normal){
+        cout<<"Normal Mode";
+    }
+    else { 
+        cout<<"Command Mode :";
+        //cout<<"\e[1m"<<": ERROR"<<this->error_code<<"\e[0m";
+    }
+    this->error_printed = false;
+}
+
+error* error :: getInstance(){
+    if(!instanceFlag){
+        Single = new error();
+        Single -> is_error = false;
+        Single -> error_printed = false;
+        Single -> error_code = "";
+        instanceFlag = true;
+        return Single;
+    }
+    else {
+        return Single;
+    }
+}
+
 struct terminal{
     termios initial_settings, new_settings;
     FILE *input,*output;
+    error *Error;
     void switch_to_non_canonical_mode();
     int switch_to_canonical_mode();
     terminal (FILE *in, FILE *out);
 };
 
 terminal :: terminal(FILE *in, FILE *out){
-	tcgetattr(fileno(in), &this->initial_settings);
+    this->Error = error :: getInstance();
+	if(tcgetattr(fileno(in), &this->initial_settings)!=0){
+        this->Error->is_error = true;
+        this->Error->error_code = "Could not get the attributes of Terminal";
+    }
     this->new_settings = this->initial_settings;
     this->input = in;
     this->output = out;
@@ -35,6 +96,8 @@ int terminal :: switch_to_canonical_mode(){
     lo x = tcsetattr(fileno(input), TCSANOW, &new_settings);
     if(x!=0){
         fprintf(stderr,"Could not set attributes\n");
+        this->Error->is_error = true;
+        this->Error->error_code = "Could not set the attributes of Terminal";
         return 1;
     }
     return 0;
@@ -45,6 +108,8 @@ void terminal :: switch_to_non_canonical_mode(){
     if(x!=0){
         fprintf(stderr,"Could not set attributes Back to original\n");
         cerr<<"Please use \"tput reset \" command to restore the original settings of terminal"<<endl;
+        this->Error->is_error = true;
+        this->Error->error_code = "Could not set the attributes of Terminal back to Normal Please use \"tput reset \" command to restore the original settings of terminal";
         return ;
     }
     return ;
@@ -54,6 +119,7 @@ void terminal :: switch_to_non_canonical_mode(){
 
 struct file_folder{
     string name_of_file_or_folder;
+    error *Error;
     string name_of_file_or_folder_for_stat;
     int d_type;
     struct stat sb;
@@ -71,6 +137,7 @@ struct file_folder{
 };
 
 file_folder :: file_folder(string name,  int type , string root_path){
+    this->Error = error :: getInstance();
     this->name_of_file_or_folder = name;
     this->d_type = type;
     if(type!=9)this->name_of_file_or_folder_for_stat = root_path + "/" + name;
@@ -93,6 +160,8 @@ int file_folder :: get_stat(){
     }
     //cerr << this->name_of_file_or_folder_for_stat << endl;
     if(stat(this->name_of_file_or_folder_for_stat.c_str(), &(this->sb)) == -1){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't execute stat"+this->name_of_file_or_folder;
         cerr<<"Cant't execute stat"<<this->name_of_file_or_folder_for_stat<<endl;
         //cerr<<this->name_of_file_or_folder_for_stat.c_str()<<endl;
         return 1;
@@ -172,9 +241,11 @@ struct directory{
     vector<file_folder> all_files_folder;
     directory ();
     int open_directory(string name);
+    error *Error;
 };
 
 directory :: directory(){
+    this->Error = error :: getInstance();
     this->current_directory = "";
     all_files_folder.clear();
 }
@@ -183,9 +254,12 @@ int directory :: open_directory(string name){
     this->current_directory = name;
     this->direct = opendir(name.c_str());
     if(this->direct == NULL){
-        cerr<<"Can't open Directory "<<name<<endl;
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant open Directory" + name;
+        cerr << "Can't open Directory " << name << endl;
         return 1;
     }
+    cerr<<"name"<<name<<endl;
     this->all_files_folder.clear();
     while((this->pDirent = readdir(this->direct)) != NULL)if(this->pDirent->d_name!=NULL){
         string file_name = string(this->pDirent->d_name);
@@ -199,12 +273,16 @@ int directory :: open_directory(string name){
 
 struct command{
     string full_command;
-    string command;
+    string command_type;
+    error *Error;
     vector<string> arguments;
     int take_command_input(FILE *input, FILE *output, int command_pos, int number_of_rows);
     void execute_command();
+    command();
 };
-
+command :: command(){
+    this->Error = error :: getInstance();
+}
 /*
 void command :: execute_command(){
     //cerr<<this->full_command<<endl;
@@ -219,7 +297,7 @@ void command :: execute_command(){
 
 void command :: execute_command(){
     istringstream iss(this->full_command);
-    iss>>this->command;
+    iss>>this->command_type;
     string temp;
     string full_command_space="";
     while(iss >> temp){
@@ -272,6 +350,9 @@ int command :: take_command_input(FILE *input, FILE *output, int command_pos, in
     char choice;
     do{
         choice = fgetc(input);
+        if(this->Error->error_printed){
+            Error->remove_error(false, number_of_rows);
+        }
         if(choice == '\n' or choice == '\r'){
             this->execute_command(); 
             return 0;
@@ -311,6 +392,7 @@ struct screen{
     directory current_directory;
     FILE *input,*output;
     screen(FILE *in, FILE *out, string home);
+    error *Error;
     void flush();
     void get_screen_size();
     void move_down();
@@ -341,16 +423,24 @@ struct screen{
 };
 
 screen :: screen(FILE *in, FILE *out, string home=""){
+    this->Error = error :: getInstance();
     this->normal = true;
     this->HOME = home;
     this->input = in;
     this->output = out;
     this->command_pos = 1;
+    this->isSearch = false;
     if(home.empty()){
         char cwd[PATH_MAX];
-        getcwd(cwd, sizeof(cwd));
+        if(getcwd(cwd, sizeof(cwd)) == NULL){
+            this->Error->is_error = true;
+            this->Error->is_error = "can't open home directory";
+             cerr << "Cant't open Home Directory " << endl;
+            return;
+        }
         this->HOME = string(cwd);
     }
+    cerr<<"this is home "<<" "<<this->HOME;
     this->x_pos = 2;
     this->current_top = 1;
     this->y_pos = 1;
@@ -393,12 +483,16 @@ void screen :: recursive_search(string source, string file_to_search, vector<str
     //derr(source);
     struct stat tmp ={0};
     if(stat(source.c_str(), &tmp) == -1){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't execute stat" + source;
         cerr<<"Cant't execute stat"<<source<<endl;
         return ;
     }
     int x = stat(source.c_str(),&tmp);
     DIR *direct = opendir(source.c_str());
     if(direct == NULL){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant'Open Directory" + source;
         cerr<<"Can't open Directory "<<source<<endl;
         return ;
     }
@@ -423,7 +517,10 @@ void screen :: flush(){
 
 void screen :: get_screen_size(){
     struct winsize size;
-    ioctl(fileno(this->input), TIOCGWINSZ, &size);
+    if(ioctl(fileno(this->input), TIOCGWINSZ, &size)!=0){
+        this->Error->is_error = true;
+        this->Error->error_code = "Can't fetch screen size";
+    }
     this->number_of_rows = (int)size.ws_row;
     this->number_of_columns = (int)size.ws_col;
     this->current_bottom = this->number_of_rows - 2;
@@ -435,6 +532,7 @@ void screen :: get_screen_size(){
 void screen :: fill_screen(){
     this->flush();
     this->get_screen_size();
+    cerr<<"curDIR"<<this->current_directory.current_directory<<endl;
     if(!this->isSearch){
         cout<<"\e[1m"<<this->current_directory.current_directory<<"\e[0m"<<endl;
     }
@@ -473,7 +571,12 @@ void screen :: fill_screen(){
     }
     cout<<"\e["<<this->number_of_rows<<";1H";
     if(this->normal){
-        cout<<"Normal Mode";
+        if(this->Error->is_error){
+            this->Error->print_error(true, this->number_of_rows);
+        }
+        else{
+           cout<<"Normal Mode";
+        }
     }
     else {
         cout<<"\e["<<this->number_of_rows<<";1H";
@@ -591,11 +694,15 @@ void screen :: move_into(){
         if(pid == 0){
             //Execute the file;
             string file_to_execute = this->current_directory.all_files_folder[this->x_pos + this->current_top - 3].name_of_file_or_folder_for_stat ;
-            cerr<<"/usr/bin/xdg-open"<< file_to_execute<<endl;
-            execl("/usr/bin/xdg-open", "xdg-open", file_to_execute.c_str(), NULL);
+            if(execl("/usr/bin/xdg-open", "xdg-open", file_to_execute.c_str(), NULL)!=0){
+                this->Error->is_error = true;
+                this->Error->error_code = "Cant't open " + file_to_execute;
+                cerr << "Cant't open " << file_to_execute <<endl;
+            }
         }
         else if(pid < 0){
-            cerr<<"Failed to fork"<<endl;
+            this->Error->is_error = true;
+            this->Error->error_code = "Cant't fork";
         }
         else {
             this->normal = true;
@@ -627,6 +734,8 @@ void screen :: goto_location(){
 void screen :: recursive_copy(string source, string destination){
     struct stat tmp ={0};
     if(stat(source.c_str(), &tmp) == -1){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't execute stat" + source;
         cerr<<"Cant't execute stat"<<source<<endl;
         return ;
     }
@@ -634,12 +743,12 @@ void screen :: recursive_copy(string source, string destination){
         this->copy_file(source, destination);
         return;
     }
-    else {
-        cerr<<"Can't execute the stat "<<source;
-    }
     DIR *direct = opendir(source.c_str());
     if(direct == NULL){
-        cerr<<"Can't open Directory "<<source<<endl;
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't Open File" + source;
+        //cerr<<"Can't open Directory "<<source<<endl;
+        cerr << "Cant't open Directory " << source <<endl;
         return ;
     }
     dirent *pDirent;
@@ -650,7 +759,12 @@ void screen :: recursive_copy(string source, string destination){
         string destination_file_name = destination + file_name;
         recursive_copy(source_file_name, destination_file_name);
     }
-    chmod(destination.c_str(), tmp.st_mode);
+    if(chmod(destination.c_str(), tmp.st_mode)!=0){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't change permissions" + destination;
+        cerr << "Cant't change permissions" << destination <<endl;
+        return;
+    }
     return ;
 }
 
@@ -660,9 +774,20 @@ void screen :: snapshot(){
     string write_file = this->current_directory.current_directory + "/" + this->Command.arguments[1];
     struct stat tmp ={0};
     if(stat(write_file.c_str(), &tmp) != -1){
-        int x = unlink(write_file.c_str());
+        if(unlink(write_file.c_str())!=0){
+            this->Error->is_error = true;
+            this->Error->error_code = "Cant't Delete file" + write_file;
+            cerr << "Cant't Delete File " << write_file <<endl;
+            return;
+        }
         //cerr<<"Cant't execute stat"<<source<<endl;
         //return ;
+    }
+    else{
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't execute stat" + write_file;
+         cerr << "Cant't execute stat " << write_file <<endl;
+        return;
     }
     recursive_snapshot(source, write_file, ".");
     return;
@@ -671,6 +796,8 @@ void screen :: snapshot(){
 void screen :: recursive_snapshot(string source, string destination, string current){
     struct stat tmp ={0};
     if(stat(source.c_str(), &tmp) == -1){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't execute stat" + source;
         cerr<<"Cant't execute stat"<<source<<endl;
         return ;
     }
@@ -679,6 +806,8 @@ void screen :: recursive_snapshot(string source, string destination, string curr
     }
     DIR *direct = opendir(source.c_str());
     if(direct == NULL){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't Open File" + source;
         cerr<<"Can't open Directory "<<source<<endl;
         return ;
     }
@@ -694,6 +823,12 @@ void screen :: recursive_snapshot(string source, string destination, string curr
     out.close();
 
     direct = opendir(source.c_str());
+    if(direct == NULL){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't Open File" + source;
+        cerr<<"Can't open Directory "<<source<<endl;
+        return ;
+    }
     while((pDirent = readdir(direct)) != NULL)if(string(pDirent->d_name)!="." and string(pDirent->d_name)!=".."){
         string file_name = "/" + string(pDirent->d_name);
         string source_file_name = source + file_name;
@@ -728,6 +863,8 @@ void screen :: recursive_delete(string source){
     //derr(source);
     struct stat tmp ={0};
     if(stat(source.c_str(), &tmp) == -1){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't execute stat" + source;
         cerr<<"Cant't execute stat"<<source<<endl;
         return ;
     }
@@ -735,12 +872,17 @@ void screen :: recursive_delete(string source){
     if (!S_ISDIR(tmp.st_mode)){
         int x = unlink(source.c_str());
         if(x!=0){
+            this->Error->is_error = true;
+            this->Error->error_code = "Cant't Delete File" + source;
             cerr<<"Can't delete file "<<source<<endl;
+            return;
         }
         return;
     }
     DIR *direct = opendir(source.c_str());
     if(direct == NULL){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't Open File" + source;
         cerr<<"Can't open Directory "<<source<<endl;
         return ;
     }
@@ -752,7 +894,10 @@ void screen :: recursive_delete(string source){
     }
     x = rmdir(source.c_str());
     if(x!=0){
-        cerr<<"Can't delete file "<<source<<endl;
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't Delete Folder" + source;
+        cerr<<"Can't open Directory "<<source<<endl;
+        return ;
     }
     return;
 }
@@ -762,18 +907,32 @@ void screen :: copy_file(string source, string destination){
     stat(source.c_str(),&tmp);
     int in_fd = open(source.c_str(), O_RDONLY);
     int out_fd = creat(destination.c_str(), __mode_t(0700));
-    if(in_fd ==-1 or out_fd == -1){
-        cerr<<"Can't open files"<<endl;
+    if(in_fd ==-1){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't Delete Folder" + source;
+        cerr<<"Can't open files"<<source<<endl;
+        return;
+    }
+    else{
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't Delete Folder" + destination;
+        cerr<<"Can't open files"<<destination<<endl;
         return;
     }
     char buff[BUFFERSIZE];
     int n_chars;
     while( (n_chars = read(in_fd, buff, BUFFERSIZE)) > 0 ){
         if( write(out_fd, buff, n_chars) != n_chars ){
+            this->Error->is_error = true;
+            this->Error->error_code = "Write error to " + destination;
             cerr<<"Write error to "<<destination<<endl;
+            return;
         }    
         if( n_chars == -1 ){
+            this->Error->is_error = true;
+            this->Error->error_code = "Read error from " + source;
             cerr<<"Read error from "<<source<<endl;
+            return;
         }
     }
     chmod(destination.c_str(), tmp.st_mode);
@@ -792,8 +951,11 @@ void screen :: create_dir(string directory="", __mode_t t = 0700){
     if(!directory.empty()){
         pathname = directory;
     }
-    if(stat(pathname.c_str(), &st) != -1){
-        cerr<<"The Folder name already exists"<<endl;
+    if(stat(pathname.c_str(), &st) == -1){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't execute stat" + pathname;
+        cerr<<"Cant't execute stat"<<pathname<<endl;
+        return ;
     }
     mkdir(pathname.c_str(),t);
 }
@@ -811,6 +973,8 @@ void screen :: create_file(){
     //derr(pathname);
     int out_fd = creat(pathname.c_str(), __mode_t(0700));
     if(out_fd == -1){
+        this->Error->is_error = true;
+        this->Error->error_code = "Cant't open files" + pathname;
         cerr<<"Can't open files"<<endl;
         return;
     }
@@ -837,39 +1001,41 @@ void screen :: rename(){
 }
 
 void screen :: execute_command(){
-    if(this->Command.command == "copy"){
+    if(this->Command.command_type == "copy"){
         this->copy();
     }
-    else if(this->Command.command == "move"){
+    else if(this->Command.command_type == "move"){
         this->move();
     }
-    else if(this->Command.command == "rename"){
+    else if(this->Command.command_type == "rename"){
         this->rename();
     }
-    else if(this->Command.command == "create_file"){
+    else if(this->Command.command_type == "create_file"){
         this->create_file();
         //cout<<"I am ‘:create_file";
     }
-    else if(this->Command.command == "create_dir"){
+    else if(this->Command.command_type == "create_dir"){
         this->create_dir();
         //cout<<"I am ‘:create_dir";
     }
-    else if(this->Command.command == "delete_file" or this->Command.command == "delete_dir"){
+    else if(this->Command.command_type == "delete_file" or this->Command.command_type == "delete_dir"){
         //do delete;
         this->__delete();
     }
-    else if(this->Command.command == "goto"){
+    else if(this->Command.command_type == "goto"){
         this->goto_location();
     }
-    else if(this->Command.command == "search"){
+    else if(this->Command.command_type == "search"){
         //do search;
         this->search();
-    }else if(this->Command.command == "snapshot"){
+    }else if(this->Command.command_type == "snapshot"){
         //do snapshot;
         this->snapshot();
     }
-    
-    this->normal = true;
+    else {
+        this->Error->is_error = true;
+        this->Error->error_code = "You have not entered a VALID Command";
+    }
     if(!this->isSearch){
         this->change_directory(this->current_directory.current_directory, this->current_position_in_history);
     }
@@ -882,12 +1048,15 @@ void screen :: execute_command(){
 }
 
 void screen :: command_mode(){
-    this->Command.command.clear();
+    this->Command.command_type.clear();
     this->Command.arguments.clear();
     cout<<"\e["<<this->number_of_rows<<";1H";
     this->command_pos = 13;
     cout<<"Command Mode \e["<<this->number_of_rows<<";"<<this->command_pos<<"H"<<" :";
     this->command_pos += 2;
+    if(this->Error->is_error){
+        this->Error->print_error(false, this->number_of_rows);
+    }
     if(this->Command.take_command_input(this->input, this->output, this->command_pos, this->number_of_rows) != 0){
         this->normal = true;
         this->fill_screen();
@@ -902,6 +1071,8 @@ int main(int argc, char* argv[]){
     FILE *input,*output;
     input = fopen("/dev/tty","r");
 	output = fopen("/dev/tty","w");
+    error *Error;
+    Error = error :: getInstance();
     terminal Terminal(input,output);
     if(Terminal.switch_to_canonical_mode()==1){
         cout<<"\e[?1049l";
