@@ -144,7 +144,7 @@ void screen :: fill_screen(){
         if(file_or_folder.is_folder()){
             cout<<"\e[2m";
         }
-        cout<<file_or_folder.name_of_file_or_folder<<endl;
+        cout<<file_or_folder.name_of_file_or_folder.substr(0,this->number_of_columns-width-8)<<endl;
         if(file_or_folder.is_folder()){
             cout<<"\e[0m";
         }
@@ -312,7 +312,6 @@ void screen :: goto_location(){
 }
 
 void screen :: recursive_copy(string source, string destination){
-    derr2(source,destination);
     struct stat tmp ={0};
     if(stat(source.c_str(), &tmp) == -1){
         this->Error->is_error = true;
@@ -340,36 +339,48 @@ void screen :: recursive_copy(string source, string destination){
         string destination_file_name = destination + file_name;
         recursive_copy(source_file_name, destination_file_name);
     }
-    if(chmod(destination.c_str(), tmp.st_mode)!=0){
-        this->Error->is_error = true;
-        this->Error->error_code += "Cant't change permissions" + destination;
-        cerr << "Cant't change permissions copy" << destination <<endl;
-        return;
-    }
+    chmod(destination.c_str(), tmp.st_mode);
     cerr<<"Copy Done";
     return ;
 }
 
 void screen :: snapshot(){
-    string source = this->Command.arguments[0];
-    source = this->current_directory.current_directory + "/" + source;
-    string write_file = this->current_directory.current_directory + "/" + this->Command.arguments[1];
-    struct stat tmp ={0};
-    if(stat(write_file.c_str(), &tmp) != -1){
-        if(unlink(write_file.c_str())!=0){
-            this->Error->is_error = true;
-            this->Error->error_code += "Cant't Delete file" + write_file;
-            cerr << "Cant't Delete File " << write_file <<endl;
-            return;
-        }
-        //cerr<<"Error in opening "<<source<<endl;
-        //return ;
+    if(this->Command.arguments.size()<2){
+        this->Error->is_error = true;
+        this->Error->error_code += "Too few arguments for snapshot";
+        return;
+    }
+    string write_file = this->Command.arguments[1];
+    if(write_file[0]=='~'){
+        write_file = write_file.substr(1,write_file.size()-1);
+        write_file = this->HOME + write_file;
+    }
+    else if(write_file[0] == '.'){
+        write_file = write_file.substr(1,write_file.size()-1);
+        write_file = this->current_directory.current_directory  + write_file;
     }
     else{
-        this->Error->is_error = true;
-        this->Error->error_code += "Error in opening " + write_file;
-        cerr << "Error in opening  " << write_file <<endl;
-        return;
+        write_file = this->current_directory.current_directory+"/"+write_file;
+    }
+    string source = this->Command.arguments[0];
+    if(source[0]=='~'){
+        source = source.substr(1,source.size()-1);
+        source = this->HOME + source;
+    }
+    else if(source[0] == '.'){
+        source = source.substr(1,source.size()-1);
+        source = this->current_directory.current_directory  + source;
+    }
+    else{
+        source = this->current_directory.current_directory+"/"+source;
+    }
+    struct stat tmp ={0};
+    if(stat(write_file.c_str(), &tmp) == -1){
+        int out_fd = creat(write_file.c_str(), __mode_t(0777));
+        if(out_fd == -1){
+            this->Error->is_error = true;
+            this->Error->error_code = "Can't create"+write_file;
+        }
     }
     recursive_snapshot(source, write_file, ".");
     return;
@@ -396,7 +407,6 @@ void screen :: recursive_snapshot(string source, string destination, string curr
     ofstream out(destination,ios :: app);
     out<<current<<" :"<<endl;
     dirent *pDirent;
-    this->create_dir(destination, tmp.st_mode);
     while((pDirent = readdir(direct)) != NULL)if(string(pDirent->d_name)!="." and string(pDirent->d_name)!=".."){
         out<<string(pDirent->d_name)<<" ";
     }
@@ -422,11 +432,11 @@ void screen :: recursive_snapshot(string source, string destination, string curr
 
 void screen :: copy(){
     string destination = this->Command.arguments.back();
-    if(this->Command.arguments[0][0]=='~'){
+    if(destination[0]=='~'){
         destination = destination.substr(1,destination.size()-1);
         destination = this->HOME + destination;
     }
-    else if(this->Command.arguments[0][0] == '.'){
+    else if(destination[0] == '.'){
         destination = destination.substr(1,destination.size()-1);
         destination = this->current_directory.current_directory  + destination;
     }
@@ -442,16 +452,16 @@ void screen :: copy(){
     }
     for(int i=0;i<this->Command.arguments.size()-1 ;i++){
         string source = this->Command.arguments[i];
-        if(this->Command.arguments[0][0]=='~'){
+        if(this->Command.arguments[i][0]=='~'){
             source = source.substr(1,source.size()-1);
             source = this->HOME + source;
         }
-        else if(this->Command.arguments[0][0] == '.'){
+        else if(this->Command.arguments[i][0] == '.'){
             source = source.substr(1,source.size()-1);
             source = this->current_directory.current_directory  + source;
         }
         else{
-            source = this->current_directory.current_directory+"/"+this->Command.arguments[0];
+            source = this->current_directory.current_directory+"/"+source;
         }
         string destination_file = destination + "/" + this->Command.arguments[i];
         //derr2(source,destination_file);
@@ -468,8 +478,8 @@ void screen :: __delete(){
         source = this->HOME + source;
     }
     else if(this->Command.arguments[0][0] == '.'){
-        source = source.substr(2,source.size()-2);
-        source = this->current_directory.current_directory + "/" + source;
+        source = source.substr(1,source.size()-1);
+        source = this->current_directory.current_directory + source;
     }
     else{
         source = this->current_directory.current_directory+"/"+this->Command.arguments[0];
@@ -536,7 +546,7 @@ void screen :: copy_file(string source, string destination){
         cerr<<"Can't open files"<<source<<endl;
         return;
     }
-    else{
+    else if(out_fd==-1){
         this->Error->is_error = true;
         this->Error->error_code += "Cant't Open " + destination;
         cerr<<"Can't open files"<<destination<<endl;
@@ -564,14 +574,19 @@ void screen :: copy_file(string source, string destination){
 
 void screen :: create_dir(string directory="", __mode_t t = 0700){
     struct stat st = {0};
-    string pathname = "";
-    if(this->Command.arguments[1]=="."){
-        pathname = this->current_directory.current_directory;
+    string pathname = this->Command.arguments[0];
+    if(pathname[0]=='~'){
+        pathname = this->Command.arguments[0];
+        pathname = pathname.substr(1,pathname.size()-1);
+        pathname = this->HOME + pathname;
     }
-    else {
-        pathname = this->HOME + this->Command.arguments[1].substr(1,this->Command.arguments[1].size()-1);
+    else if(pathname[0] == '.'){
+        pathname = pathname.substr(1,pathname.size()-1);
+        pathname = this->current_directory.current_directory + pathname;
     }
-    pathname = pathname + "/" + this->Command.arguments[0];
+    else{
+        pathname = this->current_directory.current_directory+"/"+this->Command.arguments[0];
+    }
     if(!directory.empty()){
         pathname = directory;
     }
@@ -605,26 +620,75 @@ void screen :: create_file(){
 }
 void screen :: move(){
     string destination = this->Command.arguments.back();
-    destination = destination.substr(1,destination.size()-1);
-    destination = this->HOME + destination;
+    if(destination[0]=='~'){
+        destination = destination.substr(1,destination.size()-1);
+        destination = this->HOME + destination;
+    }
+    else if(destination[0] == '.'){
+        destination = destination.substr(1,destination.size()-1);
+        destination = this->current_directory.current_directory  + destination;
+    }
+    else{
+        destination = this->current_directory.current_directory+"/"+destination;
+    }
+    struct stat tmp ={0};
+    if(stat(destination.c_str(), &tmp) == -1){
+        this->Error->is_error = true;
+        this->Error->error_code += "Error in opening " + destination;
+        cerr<<"Error in opening "<<destination<<endl;
+        return ;
+    }
     for(int i=0;i<this->Command.arguments.size()-1 ;i++){
-        string source = this->current_directory.current_directory + "/" + this->Command.arguments[i];
+        string source = this->Command.arguments[i];
+        if(source[0]=='~'){
+            source = source.substr(1,source.size()-1);
+            source = this->HOME + source;
+        }
+        else if(source[0] == '.'){
+            source = source.substr(1,source.size()-1);
+            source = this->current_directory.current_directory  + source;
+        }
+        else{
+            source = this->current_directory.current_directory+"/"+this->Command.arguments[0];
+        }
         string destination_file = destination + "/" + this->Command.arguments[i];
         //derr2(source,destination_file);
         recursive_copy(source, destination_file);
         recursive_delete(source);
     }   
+    return;
 }
 
 void screen :: rename(){
-    string destination = this->current_directory.current_directory + "/";
     if(this->Command.arguments.size()<2){
         this->Error->is_error = true;
         this->Error->error_code += "Too few arguments for rename";
         return;
     }
-    string source = destination + this->Command.arguments[0];
-    destination += this->Command.arguments[1];
+    string destination = this->Command.arguments[1];
+    if(destination[0]=='~'){
+        destination = destination.substr(1,destination.size()-1);
+        destination = this->HOME + destination;
+    }
+    else if(destination[0] == '.'){
+        destination = destination.substr(1,destination.size()-1);
+        destination = this->current_directory.current_directory  + destination;
+    }
+    else{
+        destination = this->current_directory.current_directory+"/"+destination;
+    }
+    string source = this->Command.arguments[0];
+    if(source[0]=='~'){
+        source = source.substr(1,source.size()-1);
+        source = this->HOME + source;
+    }
+    else if(source[0] == '.'){
+        source = source.substr(1,source.size()-1);
+        source = this->current_directory.current_directory  + source;
+    }
+    else{
+        source = this->current_directory.current_directory+"/"+source;
+    }
     recursive_copy(source,destination);
     recursive_delete(source);
 }

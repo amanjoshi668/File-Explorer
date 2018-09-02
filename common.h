@@ -14,6 +14,7 @@ typedef vector< vl > vvl;  //vector of vectors
 #define X first
 #define Y second
 #define BUFFERSIZE 1024
+#define wait int xxxxxx; cin>>xxxxxx;
 #define mp(a,b) make_pair((a),(b))
 #define REP(a,b) for(lo i=(a);i<(lo)b;i++)//no need to declare variable i
 #define REPE(a,b,c,d) REP(a,b)for(lo j=(c);j<(lo)d;j++)//no need to declare vaiables i,j
