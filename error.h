@@ -1,4 +1,5 @@
 #include <iostream>
+#include "common.h"
 #include <termios.h>
 #ifndef ERROR_H
 #define ERROR_H
