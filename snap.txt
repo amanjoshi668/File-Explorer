@@ -1,0 +1,51 @@
+. :
+otherrr.txt test2 level2 hello.txt test hello.trt cat2.txt other_also 
+
+./test2 :
+
+
+./level2 :
+4 level 3 cat3 cat2 cat cat1 
+
+./level2/level :
+fdgf ffd a d bc fs e fd jfdf fse fsd 
+
+./level2/level/fdgf :
+
+
+./level2/level/ffd :
+
+
+./level2/level/fd :
+
+
+./level2/level/jfdf :
+
+
+./level2/level/fse :
+
+
+./level2/level/fsd :
+
+
+./level2/3 :
+
+
+./test :
+
+
+./other_also :
+other2 other 
+
+./other_also/other2 :
+
+
+./other_also/other :
+hello 
+
+./other_also/other/hello :
+hello 
+
+./other_also/other/hello/hello :
+
+

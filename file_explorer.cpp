@@ -9,8 +9,9 @@
 #include <grp.h>
 #include <bits/stdc++.h>
 #include <fcntl.h>
+#include "error.h"
 using namespace std;
-
+/*
 struct error{
     static bool is_error;
     static bool instanceFlag;
@@ -52,7 +53,6 @@ void error :: remove_error(bool normal, int number_of_rows){
     }
     this->error_printed = false;
 }
-
 error* error :: getInstance(){
     if(!instanceFlag){
         Single = new error();
@@ -65,7 +65,7 @@ error* error :: getInstance(){
     else {
         return Single;
     }
-}
+}*/
 
 struct terminal{
     termios initial_settings, new_settings;
@@ -76,7 +76,7 @@ struct terminal{
     terminal (FILE *in, FILE *out);
 };
 
-terminal :: terminal(FILE *in, FILE *out){
+terminal::terminal(FILE *in, FILE *out){
     this->Error = error :: getInstance();
 	if(tcgetattr(fileno(in), &this->initial_settings)!=0){
         this->Error->is_error = true;
@@ -161,8 +161,8 @@ int file_folder :: get_stat(){
     //cerr << this->name_of_file_or_folder_for_stat << endl;
     if(stat(this->name_of_file_or_folder_for_stat.c_str(), &(this->sb)) == -1){
         this->Error->is_error = true;
-        this->Error->error_code += "Cant't execute stat"+this->name_of_file_or_folder;
-        cerr<<"Cant't execute stat"<<this->name_of_file_or_folder_for_stat<<endl;
+        this->Error->error_code += "Error in opening "+this->name_of_file_or_folder;
+        cerr<<"Error in opening "<<this->name_of_file_or_folder_for_stat<<endl;
         //cerr<<this->name_of_file_or_folder_for_stat.c_str()<<endl;
         return 1;
     }
@@ -485,7 +485,7 @@ void screen :: recursive_search(string source, string file_to_search, vector<str
     if(stat(source.c_str(), &tmp) == -1){
         this->Error->is_error = true;
         this->Error->error_code += "Cant't Open" + source;
-        cerr<<"Cant't execute stat"<<source<<endl;
+        cerr<<"Error in opening "<<source<<endl;
         return ;
     }
     int x = stat(source.c_str(),&tmp);
@@ -737,8 +737,8 @@ void screen :: recursive_copy(string source, string destination){
     struct stat tmp ={0};
     if(stat(source.c_str(), &tmp) == -1){
         this->Error->is_error = true;
-        this->Error->error_code += "Cant't execute stat" + source;
-        cerr<<"Cant't execute stat"<<source<<endl;
+        this->Error->error_code += "Error in opening " + source;
+        cerr<<"Error in opening "<<source<<endl;
         return ;
     }
     if (!S_ISDIR(tmp.st_mode)){
@@ -782,13 +782,13 @@ void screen :: snapshot(){
             cerr << "Cant't Delete File " << write_file <<endl;
             return;
         }
-        //cerr<<"Cant't execute stat"<<source<<endl;
+        //cerr<<"Error in opening "<<source<<endl;
         //return ;
     }
     else{
         this->Error->is_error = true;
-        this->Error->error_code += "Cant't execute stat" + write_file;
-         cerr << "Cant't execute stat " << write_file <<endl;
+        this->Error->error_code += "Error in opening " + write_file;
+         cerr << "Error in opening  " << write_file <<endl;
         return;
     }
     recursive_snapshot(source, write_file, ".");
@@ -799,8 +799,8 @@ void screen :: recursive_snapshot(string source, string destination, string curr
     struct stat tmp ={0};
     if(stat(source.c_str(), &tmp) == -1){
         this->Error->is_error = true;
-        this->Error->error_code += "Cant't execute stat" + source;
-        cerr<<"Cant't execute stat"<<source<<endl;
+        this->Error->error_code += "Error in opening " + source;
+        cerr<<"Error in opening "<<source<<endl;
         return ;
     }
     if (!S_ISDIR(tmp.st_mode)){
@@ -841,6 +841,7 @@ void screen :: recursive_snapshot(string source, string destination, string curr
 }
 
 void screen :: copy(){
+    
     string destination = this->Command.arguments.back();
     destination = destination.substr(1,destination.size()-1);
     destination = this->HOME + destination;
@@ -857,6 +858,11 @@ void screen :: __delete(){
     string source = this->Command.arguments[0];
     source = source.substr(1,source.size()-1);
     source = this->HOME + source;
+    if(this->current_directory.current_directory.find(source)== string :: npos){
+        this->Error->is_error = true;
+        this->Error->error_code += "Can't delete at this location move to parent of the path you entered";
+        return;
+    }
     recursive_delete(source);
     return;
 }
@@ -866,11 +872,10 @@ void screen :: recursive_delete(string source){
     struct stat tmp ={0};
     if(stat(source.c_str(), &tmp) == -1){
         this->Error->is_error = true;
-        this->Error->error_code += "Cant't execute stat" + source;
-        cerr<<"Cant't execute stat"<<source<<endl;
+        this->Error->error_code += "Cant't open file" + source;
+        cerr<<"Error in opening "<<source<<endl;
         return ;
     }
-    int x = stat(source.c_str(),&tmp);
     if (!S_ISDIR(tmp.st_mode)){
         int x = unlink(source.c_str());
         if(x!=0){
@@ -894,7 +899,7 @@ void screen :: recursive_delete(string source){
         string source_file_name = source + file_name;
         recursive_delete(source_file_name);
     }
-    x = rmdir(source.c_str());
+    int x = rmdir(source.c_str());
     if(x!=0){
         this->Error->is_error = true;
         this->Error->error_code += "Cant't Delete Folder" + source;
@@ -911,13 +916,13 @@ void screen :: copy_file(string source, string destination){
     int out_fd = creat(destination.c_str(), __mode_t(0700));
     if(in_fd ==-1){
         this->Error->is_error = true;
-        this->Error->error_code += "Cant't Delete Folder" + source;
+        this->Error->error_code += "Cant't Open" + source;
         cerr<<"Can't open files"<<source<<endl;
         return;
     }
     else{
         this->Error->is_error = true;
-        this->Error->error_code += "Cant't Delete Folder" + destination;
+        this->Error->error_code += "Cant't Open " + destination;
         cerr<<"Can't open files"<<destination<<endl;
         return;
     }
@@ -957,7 +962,7 @@ void screen :: create_dir(string directory="", __mode_t t = 0700){
     if(stat(pathname.c_str(), &st) == -1){
         this->Error->is_error = true;
         this->Error->error_code += "Cant't open" + pathname;
-        cerr<<"Cant't execute stat"<<pathname<<endl;
+        cerr<<"Error in opening "<<pathname<<endl;
         return ;
     }
     mkdir(pathname.c_str(),t);

@@ -1,10 +1,14 @@
 CC = g++
 CFLAGS = -Wall -std=c++1z
-DEPS = print.h common.h
-OBJ = print.o
+FLAGS = -I. -L.
+DEPS = common.h error.h
+OBJ = file_explorer.o error.o
 
-%.o: %.cpp ($DEPS)
-	$(CC) $(CFLAGS) -c -o $@ $<
+%.o: %.cpp $(DEPS)
+	$(CC) $(CFLAGS) $(FLAGS) -c -o $@ $<
 
-fileExplorer: $(OBJ)
-	$(CC) $(FLAGS) -o $@ $^
+file_explorer: $(OBJ)
+	$(CC) $(CFLAGS) -o $@ $<
+
+clean :
+	rm $(OBJ)
