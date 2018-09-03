@@ -3,7 +3,8 @@ This is a Terminal based File-Explorer.
 
 Getting Started
 It works in two modes:
-    1: Normal Mode: 
+
+    1. Normal Mode: 
         In this mode you can view all the files in current Directory. You can navigate up and down using arrow keys.
         When Enter is pressed if the corresponding entry is file it will get open using the system's default application for that particular file extension.
         While If the corresponding entry is Folder You wil navigate into that Particular Folder
