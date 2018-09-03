@@ -465,6 +465,11 @@ void screen :: copy(){
         }
         string destination_file = destination + "/" + this->Command.arguments[i];
         //derr2(source,destination_file);
+        if(source == destination_file){
+            Error->is_error = true;
+            Error->error_code = "Source and destination can't be same";
+            continue;
+        }
         recursive_copy(source, destination_file);
     }   
     return;
