@@ -144,7 +144,12 @@ void screen :: fill_screen(){
         if(file_or_folder.is_folder()){
             cout<<"\e[2m";
         }
-        cout<<file_or_folder.name_of_file_or_folder.substr(0,this->number_of_columns-width-8)<<endl;
+        if(file_or_folder.name_of_file_or_folder.length()>this->number_of_columns-width-67){
+            cout<<file_or_folder.name_of_file_or_folder.substr(0,this->number_of_columns-width-70)<<"..."<<endl;
+        }
+        else {
+            cout<<file_or_folder.name_of_file_or_folder<<endl;
+        }
         if(file_or_folder.is_folder()){
             cout<<"\e[0m";
         }
