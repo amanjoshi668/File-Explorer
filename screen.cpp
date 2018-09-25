@@ -352,7 +352,7 @@ void screen :: snapshot(){
     }
     string write_file = this->Command.arguments[1];
     if(write_file[0]=='~'){
-        write_file = write_file.substr(1,write_file.size()-1);
+        write_file = write_file.substr(2,write_file.size()-2);
         write_file = this->HOME + write_file;
     }
     else if(write_file[0] == '.'){
@@ -364,7 +364,7 @@ void screen :: snapshot(){
     }
     string source = this->Command.arguments[0];
     if(source[0]=='~'){
-        source = source.substr(1,source.size()-1);
+        source = source.substr(2,source.size()-2);
         source = this->HOME + source;
     }
     else if(source[0] == '.'){
@@ -433,7 +433,7 @@ void screen :: recursive_snapshot(string source, string destination, string curr
 void screen :: copy(){
     string destination = this->Command.arguments.back();
     if(destination[0]=='~'){
-        destination = destination.substr(1,destination.size()-1);
+        destination = destination.substr(2,destination.size()-2);
         destination = this->HOME + destination;
     }
     else if(destination[0] == '.'){
@@ -453,7 +453,7 @@ void screen :: copy(){
     for(int i=0;i<this->Command.arguments.size()-1 ;i++){
         string source = this->Command.arguments[i];
         if(this->Command.arguments[i][0]=='~'){
-            source = source.substr(1,source.size()-1);
+            source = source.substr(2,source.size()-2);
             source = this->HOME + source;
         }
         else if(this->Command.arguments[i][0] == '.'){
@@ -479,7 +479,7 @@ void screen :: __delete(){
     string source;
     if(this->Command.arguments[0][0]=='~'){
         source = this->Command.arguments[0];
-        source = source.substr(1,source.size()-1);
+        source = source.substr(2,source.size()-2);
         source = this->HOME + source;
     }
     else if(this->Command.arguments[0][0] == '.'){
@@ -582,7 +582,7 @@ void screen :: create_dir(string directory="", __mode_t t = 0700){
     string pathname = this->Command.arguments[0];
     if(pathname[0]=='~'){
         pathname = this->Command.arguments[0];
-        pathname = pathname.substr(1,pathname.size()-1);
+        pathname = pathname.substr(2,pathname.size()-2);
         pathname = this->HOME + pathname;
     }
     else if(pathname[0] == '.'){
@@ -626,7 +626,7 @@ void screen :: create_file(){
 void screen :: move(){
     string destination = this->Command.arguments.back();
     if(destination[0]=='~'){
-        destination = destination.substr(1,destination.size()-1);
+        destination = destination.substr(2,destination.size()-2);
         destination = this->HOME + destination;
     }
     else if(destination[0] == '.'){
@@ -646,7 +646,7 @@ void screen :: move(){
     for(int i=0;i<this->Command.arguments.size()-1 ;i++){
         string source = this->Command.arguments[i];
         if(source[0]=='~'){
-            source = source.substr(1,source.size()-1);
+            source = source.substr(2,source.size()-2);
             source = this->HOME + source;
         }
         else if(source[0] == '.'){
@@ -672,7 +672,7 @@ void screen :: rename(){
     }
     string destination = this->Command.arguments[1];
     if(destination[0]=='~'){
-        destination = destination.substr(1,destination.size()-1);
+        destination = destination.substr(2,destination.size()-2);
         destination = this->HOME + destination;
     }
     else if(destination[0] == '.'){
@@ -684,7 +684,7 @@ void screen :: rename(){
     }
     string source = this->Command.arguments[0];
     if(source[0]=='~'){
-        source = source.substr(1,source.size()-1);
+        source = source.substr(2,source.size()-2);
         source = this->HOME + source;
     }
     else if(source[0] == '.'){
